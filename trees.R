@@ -6,7 +6,7 @@ suppressPackageStartupMessages({
   library(rpart.plot)
 })
 
-df <- read_excel("sabolona_baserate (1).xlsx") %>%
+df <- readxl::read_excel("sabolona_baserate (1).xlsx") %>%
   mutate(
     participant_id = as.character(id),
     response = as.factor(Response),
@@ -79,24 +79,32 @@ hist(df_with_acc$participant_accuracy)
 # ── 3) Global (pooled) decision tree & plot ────────────────────────────────
 # Predict response from type and ratio across all participants
 tree_all <- rpart(
-  response ~  type + ratio + item_stem,
+  rt ~  type + ratio ,
   data   = df,
-  method = "class",
+  method = "anova",
   control = rpart.control(minsplit = 10, cp = 0.001, xval = 10)
 )
 
-
-
-# Plot the pooled tree
-rpart.plot(
-  tree_all,
-  main = "Pooled Decision Tree",
-  extra = 104,         # show probs & % in node
-  under = T,        # put class under the node
-  faclen = 0,          # don't truncate factor levels
-  varlen = 0           # don't truncate variable names
+fit <- fit_msdt(
+  data    = df,
+  N       = 3,
+  formula = response ~ type + ratio,
+  id_col  = "participant_id",
+  minbucket = 50, cp = 0.001, max_iter = 500, conv_tol = 1e-3
+  
+  
 )
 
+
+state_hat <- max.col(fit$state_probs)           # 1..N
+df$hmm_state <- factor(state_hat, levels = 1:fit$N)
+
+fit$gamma %>% round(2)
+
+# Inspect trees per state
+fit$mod[[1]] %>% rpart.plot()
+fit$mod[[2]] %>% rpart.plot()
+fit$mod[[3]] %>% rpart.plot()
 # ── Accuracy bins (10% width) ──────────────────────────────────────────────
 acc_bins <- acc_by_participant %>%
   filter(!is.na(participant_accuracy)) %>%
